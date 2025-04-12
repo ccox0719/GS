@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Galactic Shipyard – Deck Builder</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="setup-screen">
+    <h1>Galactic Shipyard Setup</h1>
+    <label for="player-count">Number of Players:</label>
+    <select id="player-count" onchange="buildPlayerInputs()">
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+    <div id="player-inputs"></div>
+    <button onclick="startGame()">Start Game</button>
+  </div>
+
+  <div id="game-screen" style="display:none;">
+    <h1>Galactic Shipyard</h1>
+
+    <div id="player-display"><span style="color: #0ff;">Player 1</span>: Draw your hand</div>
+
+    <div id="deck-info">
+      <p>Deck: <span id="deck-count">0</span> cards</p>
+      <p>Discard: <span id="discard-count">0</span> cards</p>
+    </div>
+
+    <div id="hand"></div>
+    <div id="queue-display">Queued: []</div>
+
+    <button id="submit" onclick="submitTurn()">Submit Actions</button>
+
+    <div>
+      <h3>Add New Card to Discard</h3>
+      <select id="newCard">
+        <option value="Cloak">Cloak</option>
+        <option value="Overload">Overload Reactor</option>
+        <option value="Shield Pulse">Shield Pulse</option>
+        <option value="Hack">System Hack</option>
+        <option value="Fire">★ Fire</option>
+        <option value="Move">↑ Move</option>
+        <option value="Strafe">⤾ Strafe</option>
+        <option value="Boost">⇈ Boost</option>
+        <option value="Delay">– Delay</option>
+      </select>
+      <button onclick="addNewCard()">Add to Discard</button>
+    </div>
+
+    <div id="result-display"></div>
+  </div>
+
+  <div id="overlay" style="display:none;" onclick="continueFromOverlay()">
+    <div id="overlay-message"></div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

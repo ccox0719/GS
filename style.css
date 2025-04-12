@@ -1,0 +1,112 @@
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0d0d0d;
+    color: #0ff;
+    text-align: center;
+    padding: 20px;
+  }
+  
+  h1 {
+    margin-bottom: 10px;
+  }
+  
+  #deck-info {
+    margin-bottom: 10px;
+    font-size: 1em;
+    color: #0ff;
+  }
+  
+  #hand {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 15px 0;
+  }
+  
+  .card-btn {
+    background: linear-gradient(145deg, #111, #222);
+    border: 3px solid #0ff; /* Will be overwritten by JS */
+    border-radius: 12px;
+    width: 100px;
+    height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #0ff;
+    font-size: 1.2em;
+    cursor: pointer;
+    box-shadow: 0 0 10px #0ff4;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.3s;
+  }
+  
+  .card-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #0ff8;
+  }
+  
+  .card-btn.selected {
+    background-color: #0ff;
+    color: #000;
+    border-color: #000;
+    font-weight: bold;
+    box-shadow: 0 0 15px #0ff;
+  }
+  
+  #queue-display {
+    font-size: 1.1em;
+    margin-bottom: 15px;
+  }
+  
+  #result-display {
+    margin-top: 20px;
+    font-size: 1.2em;
+    min-height: 100px;
+  }
+  
+  select, input, button {
+    font-size: 1em;
+    padding: 6px 12px;
+    margin: 10px;
+    border-radius: 6px;
+  }
+  
+  #submit {
+    background-color: #0a0;
+    color: #fff;
+    border: none;
+    font-size: 1.2em;
+    padding: 10px 20px;
+    cursor: pointer;
+  }
+  
+  #overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000c;
+    color: #0ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8em;
+    z-index: 9999;
+    cursor: pointer;
+  }
+  
+  #overlay-message {
+    text-align: center;
+    padding: 20px;
+  }
+  
+  #setup-screen {
+    max-width: 500px;
+    margin: auto;
+  }
+  
+  #player-inputs {
+    margin-top: 15px;
+  }
