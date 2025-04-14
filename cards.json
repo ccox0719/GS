@@ -1,0 +1,124 @@
+[
+  {
+    "id": "overload",
+    "name": "Overload Reactor",
+    "type": "utility",
+    "description": "Gain +1 action this round",
+    "timing": "immediate",
+    "duration": "thisRound",
+    "effect": {
+      "extraActions": 1
+    },
+    "symbols": ["⚡", "➕", "🕐"]
+  },
+  {
+    "id": "cloak",
+    "name": "Cloaking Device",
+    "type": "defense",
+    "description": "Cannot be targeted this round unless scanned",
+    "timing": "start",
+    "duration": "thisRound",
+    "effect": {
+      "untargetable": true
+    },
+    "symbols": ["🛡️", "👻"]
+  },
+  {
+    "id": "shieldPulse",
+    "name": "Shield Pulse",
+    "type": "defense",
+    "description": "Reactivates 1 shield module",
+    "timing": "immediate",
+    "duration": "instant",
+    "effect": {
+      "restoreShield": true
+    },
+    "symbols": ["🛡️", "🔋"]
+  },
+  {
+    "id": "systemHack",
+    "name": "System Hack",
+    "type": "offense",
+    "description": "Target discards 1 programmed action at random",
+    "timing": "step1",
+    "duration": "instant",
+    "effect": {
+      "forceDiscard": 1
+    },
+    "symbols": ["👾", "💥", "🔀"]
+  },
+  {
+    "id": "scannerSweep",
+    "name": "Scanner Sweep",
+    "type": "utility",
+    "description": "View opponent's programmed actions before revealing yours",
+    "timing": "preReveal",
+    "duration": "instant",
+    "effect": {
+      "viewOpponentQueue": true
+    },
+    "symbols": ["👁️", "📡"]
+  },
+  {
+    "id": "forwardBatteries",
+    "name": "Forward Batteries",
+    "type": "offense",
+    "description": "+1 to accuracy for all attacks this round",
+    "timing": "start",
+    "duration": "thisRound",
+    "effect": {
+      "fireBonus": 1
+    },
+    "symbols": ["🎯", "💥", "➕"]
+  },
+  {
+    "id": "reactiveArmor",
+    "name": "Reactive Armor",
+    "type": "defense",
+    "description": "If hit, cancel 1 damage and counter-fire at attacker",
+    "timing": "triggered",
+    "duration": "untilHit",
+    "effect": {
+      "blockDamage": 1,
+      "counterFire": true
+    },
+    "symbols": ["🛡️", "🔁", "💥"]
+  },
+  {
+    "id": "empBurst",
+    "name": "EMP Burst",
+    "type": "utility",
+    "description": "All opponents skip their first action",
+    "timing": "start",
+    "duration": "thisRound",
+    "effect": {
+      "opponentSkipFirstAction": true
+    },
+    "symbols": ["💣", "⏸️", "⚡"]
+  },
+  {
+    "id": "turboBoost",
+    "name": "Turbo Boost",
+    "type": "movement",
+    "description": "Move 2 forward and turn once",
+    "timing": "step2",
+    "duration": "instant",
+    "effect": {
+      "move": 2,
+      "freeTurn": true
+    },
+    "symbols": ["➡️", "➡️", "↩️"]
+  },
+  {
+    "id": "decoyBeacon",
+    "name": "Decoy Beacon",
+    "type": "utility",
+    "description": "Swap location with decoy token at end of step 1",
+    "timing": "step1End",
+    "duration": "instant",
+    "effect": {
+      "teleportToDecoy": true
+    },
+    "symbols": ["🎭", "🔄", "📍"]
+  }
+]
