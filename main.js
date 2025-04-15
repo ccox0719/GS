@@ -193,7 +193,6 @@ function loadCardBrowser() {
     .then(res => res.json())
     .then(data => renderCardList(data));
 }
-
 function renderCardList(cards) {
   const container = document.getElementById('card-list');
   container.innerHTML = "";
@@ -201,7 +200,12 @@ function renderCardList(cards) {
     const div = document.createElement('div');
     div.className = 'card-tile';
     const icons = card.symbols ? card.symbols.join(" ") : "";
+    const imageHtml = card.image
+      ? `<img src="${card.image}" alt="${card.name}" class="card-image" />`
+      : "";
+    
     div.innerHTML = `
+      ${imageHtml}
       <h3>${icons} ${card.name}</h3>
       <div class="type ${card.type}">${card.type}</div>
       <div class="description">${card.description || "No description provided."}</div>
@@ -209,7 +213,6 @@ function renderCardList(cards) {
     `;
     container.appendChild(div);
   });
-  document.getElementById('card-browser').style.display = 'block';
 }
 
 function hideCardBrowser() {
