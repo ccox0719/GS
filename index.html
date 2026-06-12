@@ -100,13 +100,35 @@
   .board .delta{font-size:.85rem;margin-top:.35rem}
   .board .delta.up{color:var(--gain)} .board .delta.down{color:var(--loss)}
   .stats{
-    display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;
+    display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem .9rem;
     margin-top:1rem;border-top:1px solid var(--line);padding-top:.85rem;
   }
   .stat label{display:block;font-size:.58rem;letter-spacing:.13em;
     text-transform:uppercase;color:var(--muted);margin-bottom:.25rem}
   .stat b{font-size:.95rem;font-weight:600;font-variant-numeric:tabular-nums}
   .stat b.amber{color:var(--amber)}
+
+  .spark{width:100%;height:36px;display:block;margin-top:.55rem}
+  .sellbox{display:none;margin-top:.6rem;border-top:1px solid var(--line);padding-top:.6rem}
+  .sellbox.show{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+  .sellbox input{width:5.5rem;background:var(--ink);border:1px solid var(--line);
+    border-radius:6px;color:var(--paper);padding:.45rem .5rem;font-size:.9rem}
+  .sellbox button{border-radius:6px;font-size:.68rem;letter-spacing:.06em;
+    text-transform:uppercase;padding:.5rem .8rem}
+  .sellbox .max{background:var(--panel-2);border:1px solid var(--line);color:var(--muted)}
+  .sellbox .go{background:var(--loss);border:none;color:#1b0606;font-weight:600}
+  .sellbox .no{background:none;border:1px solid var(--line);color:var(--muted)}
+  .panel-pop{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:.9rem;margin-top:1rem}
+  .panel-pop label{display:block;font-size:.6rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted);margin:.5rem 0 .3rem}
+  .panel-pop input{width:100%;background:var(--ink);border:1px solid var(--line);
+    border-radius:6px;color:var(--paper);padding:.55rem .6rem;font-size:.85rem}
+  .panel-pop .rowbtns{display:flex;gap:.5rem;margin-top:.8rem}
+  .panel-pop .rowbtns button{flex:1;padding:.55rem 0;border-radius:6px;font-size:.7rem;
+    letter-spacing:.06em;text-transform:uppercase}
+  .panel-pop .danger{background:var(--loss);border:none;color:#1b0606;font-weight:600}
+  .panel-pop .quiet{background:none;border:1px solid var(--line);color:var(--muted)}
 
   /* ---------- Section labels ---------- */
   .sect{
@@ -282,6 +304,7 @@
     <div class="delta" id="nwDelta">—</div>
     <div class="stats">
       <div class="stat"><label>Cash</label><b id="statCash">—</b></div>
+      <div class="stat"><label>Invested</label><b id="statInv">—</b></div>
       <div class="stat"><label>Day</label><b id="statDay" class="amber">—</b></div>
       <div class="stat"><label>Streak</label><b id="statStreak" class="amber">—</b></div>
     </div>
@@ -313,6 +336,8 @@
         </div>
         <div class="recbar" id="rRec"></div>
         <div class="reckey" id="rRecKey"></div>
+        <canvas class="spark" id="rChart" style="height:64px;margin-top:.8rem"></canvas>
+        <div class="reckey" id="rChartNote" style="margin-top:.2rem"></div>
         <div class="news" id="rNews"></div>
       </div>
     </div>
@@ -338,10 +363,23 @@
   <div class="sect">Tape log</div>
   <div class="log" id="log"></div>
 
+  <div class="panel-pop hidden" id="settingsPanel">
+    <label>Finnhub API key</label>
+    <input type="text" id="setKey" autocomplete="off">
+    <div class="rowbtns">
+      <button class="btn-amber" id="saveKeyBtn">Save key</button>
+      <button class="quiet" id="closeSetBtn">Close</button>
+    </div>
+    <label style="margin-top:1rem">Reset desk (wipes holdings, history, log — keeps key)</label>
+    <input type="number" id="setCash" value="10000" min="100" step="100">
+    <div class="rowbtns">
+      <button class="danger" id="confirmResetBtn">Reset everything</button>
+    </div>
+  </div>
+
   <div class="footer-note">
     quotes © finnhub · paper money only ·
-    <button id="settingsBtn">api key</button> ·
-    <button id="resetBtn">reset desk</button>
+    <button id="settingsBtn">settings & reset</button>
   </div>
 </main>
 </div>
@@ -388,7 +426,23 @@ async function fetchQuote(sym){
   const q = await r.json();
   if(!q || !q.c) throw new Error("No quote for that symbol.");
   quotes[sym] = q;
+  recordPx(sym, q);
   return q;
+}
+
+function recordPx(sym, q){ // build our own daily-close history (free tier has no candles)
+  S.px = S.px || {};
+  const arr = S.px[sym] = S.px[sym] || [];
+  const t = today();
+  if(q.pc && !arr.length){ // seed yesterday's close so charts start with 2 points
+    const y = new Date(Date.now()-864e5).toISOString().slice(0,10);
+    arr.push({d:y, v:+q.pc});
+  }
+  const last = arr[arr.length-1];
+  if(last && last.d === t) last.v = +q.c;
+  else arr.push({d:t, v:+q.c});
+  if(arr.length > 180) S.px[sym] = arr.slice(-180);
+  save();
 }
 async function refreshHoldings(){
   const syms = [...new Set([...Object.keys(S.holdings), ...(S.watch||[])])];
@@ -467,6 +521,13 @@ async function loadResearch(sym){
       $("rRecKey").innerHTML = `<span>analysts (${r0.period}): ${r0.strongBuy+r0.buy} buy</span><span>${r0.hold} hold</span><span>${r0.sell+r0.strongSell} sell</span>`;
     }
   }
+
+  // price chart from recorded daily closes
+  const px = (S.px && S.px[sym]) || [];
+  drawSpark($("rChart"), px.map(p=>p.v), {color:"#ffb454"});
+  $("rChartNote").innerHTML = px.length>=2
+    ? `<span>${px[0].d}</span><span>${px.length} sessions recorded · builds daily</span>`
+    : `<span></span><span>price history records each day you check in</span>`;
 
   // headlines
   if(Array.isArray(news) && news.length){
@@ -573,6 +634,7 @@ function render(){
   el.className = "delta " + (tot>=0?"up":"down");
 
   $("statCash").textContent = fmt(S.cash);
+  $("statInv").textContent = fmt(nw - S.cash);
   const dc = dayChange();
   const sd = $("statDay");
   sd.textContent = (dc>=0?"+":"−") + fmt(Math.abs(dc));
@@ -600,7 +662,7 @@ function renderHoldings(){
     const mv = h.shares*px, pl = mv - h.cost, plPct = h.cost? pl/h.cost*100 : 0;
     const day = q && typeof q.dp==="number" ? q.dp : null;
     return `<div class="holding">
-      <div class="row1"><span class="tick">${s}</span><span class="px">${fmt(px)}</span></div>
+      <div class="row1"><span class="tick">${s}</span><span class="px">${q?fmt(px):fmt(px)+' <span style="color:#56655a;font-size:.6rem">STALE</span>'}</span></div>
       <div class="row2">
         <span>${h.shares} sh · avg ${fmt(h.cost/h.shares)}</span>
         <span>${day===null?"":(day>=0?'<span class="pl up">+':'<span class="pl down">')+day.toFixed(2)+"% today</span>"}</span>
@@ -609,14 +671,69 @@ function renderHoldings(){
         <span>value ${fmt(mv)}</span>
         <span class="pl ${pl>=0?"up":"down"}">${pl>=0?"+":"−"}${fmt(Math.abs(pl))} (${pl>=0?"+":"−"}${Math.abs(plPct).toFixed(1)}%)</span>
       </div>
+      <canvas class="spark" data-spark="${s}"></canvas>
       <div class="acts">
         <button data-buy="${s}">Buy more</button>
-        <button data-sell="${s}">Sell</button>
+        <button data-selltoggle="${s}">Sell</button>
+      </div>
+      <div class="sellbox" id="sell-${s}">
+        <input type="number" min="1" max="${h.shares}" value="${h.shares}" id="sellqty-${s}" aria-label="Shares to sell">
+        <button class="max" data-max="${s}">Max ${h.shares}</button>
+        <button class="go" data-sellgo="${s}">Confirm sell</button>
+        <button class="no" data-sellno="${s}">Cancel</button>
       </div>
     </div>`;
   }).join("");
   wrap.querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>{ $("symInput").value=b.dataset.buy; doQuote(); });
-  wrap.querySelectorAll("[data-sell]").forEach(b=>b.onclick=()=>doSell(b.dataset.sell));
+  wrap.querySelectorAll("[data-selltoggle]").forEach(b=>b.onclick=()=>{
+    $("sell-"+b.dataset.selltoggle).classList.toggle("show");
+  });
+  wrap.querySelectorAll("[data-max]").forEach(b=>b.onclick=()=>{
+    $("sellqty-"+b.dataset.max).value = S.holdings[b.dataset.max].shares;
+  });
+  wrap.querySelectorAll("[data-sellno]").forEach(b=>b.onclick=()=>{
+    $("sell-"+b.dataset.sellno).classList.remove("show");
+  });
+  wrap.querySelectorAll("[data-sellgo]").forEach(b=>b.onclick=()=>{
+    const s = b.dataset.sellgo;
+    doSell(s, Math.floor(+$("sellqty-"+s).value));
+  });
+  // sparklines from recorded daily closes
+  syms.forEach(s=>{
+    const arr = (S.px && S.px[s]) || [];
+    drawSpark(wrap.querySelector(`[data-spark="${s}"]`), arr.map(p=>p.v));
+  });
+}
+
+function drawSpark(canvas, vals, opts={}){
+  if(!canvas) return;
+  const dpr = devicePixelRatio||1;
+  const W = canvas.width = canvas.clientWidth*dpr;
+  const H = canvas.height = canvas.clientHeight*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,W,H);
+  if(!vals || vals.length<2){
+    ctx.fillStyle="#56655a"; ctx.font=(9*dpr)+"px IBM Plex Mono";
+    ctx.fillText("chart grows with each daily check-in", 4*dpr, H/2+3*dpr);
+    return;
+  }
+  let min=Math.min(...vals), max=Math.max(...vals);
+  if(min===max){min-=.5;max+=.5}
+  const pad=3*dpr;
+  const X=i=>pad+i*(W-2*pad)/(vals.length-1);
+  const Y=v=>H-pad-(v-min)*(H-2*pad)/(max-min);
+  const up = vals[vals.length-1]>=vals[0];
+  const col = opts.color || (up?"#5ce5a3":"#ff6b6b");
+  // soft fill
+  ctx.beginPath();
+  vals.forEach((v,i)=> i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));
+  ctx.lineTo(X(vals.length-1),H); ctx.lineTo(X(0),H); ctx.closePath();
+  ctx.fillStyle = col+"22"; ctx.fill();
+  ctx.beginPath();
+  vals.forEach((v,i)=> i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));
+  ctx.strokeStyle = col; ctx.lineWidth=1.5*dpr; ctx.lineJoin="round"; ctx.stroke();
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(X(vals.length-1),Y(vals[vals.length-1]),2.2*dpr,0,7); ctx.fill();
 }
 
 function renderTape(){
@@ -733,12 +850,11 @@ function doBuy(){
   msg(`Filled — bought ${n} ${pendingSym} @ ${fmt(q.c)}.`,"ok");
 }
 
-async function doSell(sym){
+async function doSell(sym, n){
   const h = S.holdings[sym]; if(!h) return;
-  const ans = prompt(`Sell how many ${sym}? (you hold ${h.shares})`, h.shares);
-  if(ans===null) return;
-  const n = Math.floor(+ans);
-  if(!n || n<1 || n>h.shares) return alert("Enter a number between 1 and "+h.shares+".");
+  if(!n || n<1 || n>h.shares){
+    return msg(`Sell quantity must be between 1 and ${h.shares}.`,"err");
+  }
   try{ await fetchQuote(sym); }catch(e){ /* sell at last known */ }
   const px = quotes[sym] ? quotes[sym].c : h.cost/h.shares;
   const proceeds = n*px;
@@ -748,7 +864,7 @@ async function doSell(sym){
   if(h.shares<=0) delete S.holdings[sym];
   S.log.unshift({t:today(),k:"SELL",s:sym,n,p:px});
   snapshot(); save(); render();
-  msg(`Filled — sold ${n} ${sym} @ ${fmt(px)}.`,"ok");
+  msg(`Filled — sold ${n} ${sym} @ ${fmt(px)} for ${fmt(proceeds)}.`,"ok");
 }
 
 async function fullRefresh(){
@@ -792,17 +908,32 @@ $("scoutRefresh").onclick = fullRefresh;
 $("watchBtn").onclick = addWatch;
 $("watchInput").addEventListener("keydown", e=>{ if(e.key==="Enter") addWatch(); });
 $("settingsBtn").onclick = () => {
-  const k = prompt("Finnhub API key:", S.key||"");
-  if(k!==null && k.trim()){ S.key=k.trim(); save(); fullRefresh(); }
+  $("setKey").value = S.key || "";
+  $("settingsPanel").classList.toggle("hidden");
 };
-$("resetBtn").onclick = () => {
-  if(confirm("Reset the desk? Wipes holdings, history, and the log. Your API key is kept.")){
-    const k = S.key;
-    const c = Math.max(100, +(prompt("New starting cash:","10000")||10000));
-    S = freshState(k,c); checkIn(); snapshot(); save(); render();
-  }
+$("closeSetBtn").onclick = () => $("settingsPanel").classList.add("hidden");
+$("saveKeyBtn").onclick = () => {
+  const k = $("setKey").value.trim();
+  if(!k) return;
+  S.key = k; save();
+  $("settingsPanel").classList.add("hidden");
+  fullRefresh();
 };
-window.addEventListener("resize", renderChart);
+$("confirmResetBtn").onclick = () => {
+  const k = S.key;
+  const c = Math.max(100, +$("setCash").value || 10000);
+  S = freshState(k, c);
+  checkIn(); snapshot(); save();
+  $("settingsPanel").classList.add("hidden");
+  render();
+};
+window.addEventListener("resize", ()=>{
+  renderChart();
+  Object.keys((S&&S.holdings)||{}).forEach(s=>{
+    const c = document.querySelector(`[data-spark="${s}"]`);
+    if(c) drawSpark(c, ((S.px&&S.px[s])||[]).map(p=>p.v));
+  });
+});
 setInterval(renderLamp, 60000);
 
 boot();
