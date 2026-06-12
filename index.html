@@ -179,6 +179,45 @@
   .msg{margin-top:.6rem;font-size:.72rem;min-height:1em}
   .msg.err{color:var(--loss)} .msg.ok{color:var(--gain)}
 
+  /* ---------- Research ---------- */
+  .research{display:none;margin-top:.8rem;border-top:1px solid var(--line);padding-top:.8rem}
+  .research.show{display:block}
+  .rname{font-size:.78rem;color:var(--paper)}
+  .rname em{color:var(--muted);font-style:normal;font-size:.66rem;margin-left:.4rem}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;margin-top:.7rem}
+  .metrics div label{display:block;font-size:.56rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:.18rem}
+  .metrics div b{font-size:.82rem;font-weight:600;font-variant-numeric:tabular-nums}
+  .recbar{display:flex;height:.55rem;border-radius:4px;overflow:hidden;margin-top:.7rem}
+  .recbar i{display:block;height:100%}
+  .reckey{display:flex;justify-content:space-between;font-size:.6rem;color:var(--muted);margin-top:.3rem}
+  .range-rail{position:relative;height:4px;background:var(--line);border-radius:2px;margin-top:.7rem}
+  .range-rail i{position:absolute;top:-3px;width:10px;height:10px;border-radius:50%;
+    background:var(--amber);transform:translateX(-50%)}
+  .range-lbl{display:flex;justify-content:space-between;font-size:.6rem;color:var(--muted);margin-top:.3rem}
+  .news{margin-top:.7rem}
+  .news a{display:block;color:var(--paper);text-decoration:none;font-size:.7rem;
+    line-height:1.45;padding:.4rem 0;border-top:1px solid var(--line)}
+  .news a:hover{color:var(--amber)}
+  .news a time{display:block;color:#56655a;font-size:.58rem;margin-top:.15rem;
+    text-transform:uppercase;letter-spacing:.08em}
+
+  /* ---------- Scout / watchlist ---------- */
+  .scout-add{display:flex;gap:.5rem;margin-bottom:.55rem}
+  .scout-add input{flex:1;background:var(--ink);border:1px solid var(--line);border-radius:6px;
+    color:var(--paper);padding:.55rem .7rem;font-size:.9rem;text-transform:uppercase}
+  .scout-add input::placeholder{color:#56655a;text-transform:none}
+  .watch-row{
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:.55rem .75rem;margin-bottom:.4rem;font-variant-numeric:tabular-nums;
+  }
+  .watch-row .wsym{color:var(--amber);font-weight:600;letter-spacing:.05em;cursor:pointer}
+  .watch-row .wpx{font-size:.85rem}
+  .watch-row .wchg{font-size:.75rem;min-width:5.2rem;text-align:right}
+  .watch-row .wx{background:none;border:none;color:#56655a;font-size:.85rem;padding:0 0 0 .6rem}
+  .watch-row .wx:hover{color:var(--loss)}
+
   /* ---------- Chart ---------- */
   canvas{width:100%;height:130px;display:block}
   .chart-wrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.8rem}
@@ -265,9 +304,30 @@
         <span class="est" id="orderEst">—</span>
         <button class="btn-amber" id="buyBtn">Buy</button>
       </div>
+      <div class="research" id="research">
+        <div class="rname" id="rName">—</div>
+        <div class="metrics" id="rMetrics"></div>
+        <div id="rRangeWrap">
+          <div class="range-rail"><i id="rDot" style="left:50%"></i></div>
+          <div class="range-lbl"><span id="r52lo">52w low —</span><span id="r52hi">52w high —</span></div>
+        </div>
+        <div class="recbar" id="rRec"></div>
+        <div class="reckey" id="rRecKey"></div>
+        <div class="news" id="rNews"></div>
+      </div>
     </div>
     <div class="msg" id="deskMsg"></div>
   </div>
+
+  <div class="sect">Scout <button id="scoutRefresh">↻ Refresh</button></div>
+  <div class="scout-add">
+    <input type="text" id="watchInput" placeholder="Watch a ticker…" maxlength="8">
+    <button class="btn-amber" id="watchBtn">+ Watch</button>
+  </div>
+  <div id="watchlist"></div>
+
+  <div class="sect">Market wire</div>
+  <div class="news" id="wire" style="margin-top:0"><div style="color:#56655a;font-size:.7rem">Loading headlines…</div></div>
 
   <div class="sect">Net worth</div>
   <div class="chart-wrap">
@@ -310,7 +370,7 @@ function save(){
   catch(e){ memStore = j; }
 }
 function freshState(key, cash){
-  return { key, cash, start: cash, holdings:{}, log:[], history:[],
+  return { key, cash, start: cash, holdings:{}, log:[], history:[], watch:[],
            lastVisit:null, streak:0, created: today() };
 }
 
@@ -331,10 +391,138 @@ async function fetchQuote(sym){
   return q;
 }
 async function refreshHoldings(){
-  const syms = Object.keys(S.holdings);
+  const syms = [...new Set([...Object.keys(S.holdings), ...(S.watch||[])])];
   for(const s of syms){
     try{ await fetchQuote(s); }catch(e){ /* keep stale quote */ }
   }
+}
+
+async function fh(path){ // generic Finnhub GET, returns parsed JSON or null
+  try{
+    const r = await fetch(`https://finnhub.io/api/v1/${path}${path.includes("?")?"&":"?"}token=${S.key}`);
+    if(!r.ok) return null;
+    return await r.json();
+  }catch(e){ return null; }
+}
+
+/* ---------- research ---------- */
+const num = (v,dp=1) => (v===null||v===undefined||isNaN(v)) ? "—" : (+v).toFixed(dp);
+function mcap(v){ // Finnhub reports market cap in $M
+  if(!v) return "—";
+  return v>=1e6 ? "$"+(v/1e6).toFixed(2)+"T" : v>=1e3 ? "$"+(v/1e3).toFixed(1)+"B" : "$"+v.toFixed(0)+"M";
+}
+async function loadResearch(sym){
+  const R = $("research");
+  R.classList.add("show");
+  $("rName").textContent = "Researching…";
+  $("rMetrics").innerHTML = ""; $("rRec").innerHTML = ""; $("rRecKey").innerHTML = ""; $("rNews").innerHTML = "";
+
+  const to = today();
+  const from = new Date(Date.now()-14*864e5).toISOString().slice(0,10);
+  const [prof, met, rec, news] = await Promise.all([
+    fh(`stock/profile2?symbol=${sym}`),
+    fh(`stock/metric?symbol=${sym}&metric=all`),
+    fh(`stock/recommendation?symbol=${sym}`),
+    fh(`company-news?symbol=${sym}&from=${from}&to=${to}`)
+  ]);
+  if(pendingSym !== sym) return; // user moved on
+
+  // profile
+  $("rName").innerHTML = prof && prof.name
+    ? `${prof.name}<em>${prof.finnhubIndustry||""}</em>`
+    : "No company profile (ETFs/funds often lack one).";
+
+  // metrics
+  const m = met && met.metric ? met.metric : {};
+  const rows = [
+    ["P/E (TTM)", num(m.peTTM ?? m.peBasicExclExtraTTM)],
+    ["Mkt cap", mcap(prof && prof.marketCapitalization)],
+    ["Beta", num(m.beta,2)],
+    ["Div yield", m.currentDividendYieldTTM!=null ? num(m.currentDividendYieldTTM,2)+"%" : "—"],
+    ["Margin", m.netProfitMarginTTM!=null ? num(m.netProfitMarginTTM,1)+"%" : "—"],
+    ["Rev growth", m.revenueGrowthTTMYoy!=null ? num(m.revenueGrowthTTMYoy,1)+"%" : "—"]
+  ];
+  $("rMetrics").innerHTML = rows.map(([l,v])=>`<div><label>${l}</label><b>${v}</b></div>`).join("");
+
+  // 52-week position
+  const lo = m["52WeekLow"], hi = m["52WeekHigh"], q = quotes[sym];
+  if(lo && hi && hi>lo && q){
+    const pct = Math.min(100, Math.max(0, (q.c-lo)/(hi-lo)*100));
+    $("rDot").style.left = pct+"%";
+    $("r52lo").textContent = "52w low "+fmt(lo);
+    $("r52hi").textContent = "52w high "+fmt(hi);
+    $("rRangeWrap").style.display = "";
+  } else $("rRangeWrap").style.display = "none";
+
+  // analyst recommendations (latest month)
+  if(Array.isArray(rec) && rec.length){
+    const r0 = rec[0];
+    const parts = [
+      [r0.strongBuy,"#5ce5a3"],[r0.buy,"#9bdcb6"],[r0.hold,"#ffb454"],
+      [r0.sell,"#e09090"],[r0.strongSell,"#ff6b6b"]
+    ];
+    const total = parts.reduce((a,[n])=>a+(n||0),0);
+    if(total){
+      $("rRec").innerHTML = parts.map(([n,c])=>`<i style="width:${(n||0)/total*100}%;background:${c}"></i>`).join("");
+      $("rRecKey").innerHTML = `<span>analysts (${r0.period}): ${r0.strongBuy+r0.buy} buy</span><span>${r0.hold} hold</span><span>${r0.sell+r0.strongSell} sell</span>`;
+    }
+  }
+
+  // headlines
+  if(Array.isArray(news) && news.length){
+    $("rNews").innerHTML = news.slice(0,3).map(n=>
+      `<a href="${n.url}" target="_blank" rel="noopener">${n.headline}<time>${n.source} · ${new Date(n.datetime*1000).toLocaleDateString()}</time></a>`
+    ).join("");
+  }
+}
+
+/* ---------- scout watchlist ---------- */
+function renderWatch(){
+  const wrap = $("watchlist");
+  const list = (S.watch||[]).filter(s=>!S.holdings[s]);
+  const all = [...new Set([...Object.keys(S.holdings), ...list])];
+  if(!all.length){
+    wrap.innerHTML = '<div class="empty">Watch a few tickers — Scout ranks the day\'s movers so dips are easy to spot.</div>';
+    return;
+  }
+  const rows = all.map(s=>({s, q:quotes[s], held:!!S.holdings[s]}))
+    .sort((a,b)=>((b.q&&b.q.dp)||-999)-((a.q&&a.q.dp)||-999));
+  wrap.innerHTML = rows.map(({s,q,held})=>{
+    const chg = q && typeof q.dp==="number"
+      ? `<span class="wchg pl ${q.dp>=0?"up":"down"}">${q.dp>=0?"▲":"▼"} ${Math.abs(q.dp).toFixed(2)}%</span>`
+      : `<span class="wchg" style="color:#56655a">…</span>`;
+    return `<div class="watch-row">
+      <span class="wsym" data-go="${s}">${s}${held?' <span style="color:#56655a;font-size:.6rem">HELD</span>':""}</span>
+      <span class="wpx">${q?fmt(q.c):"—"}</span>${chg}
+      ${held?'<span class="wx" style="opacity:0">×</span>':`<button class="wx" data-unwatch="${s}" aria-label="Remove ${s}">×</button>`}
+    </div>`;
+  }).join("");
+  wrap.querySelectorAll("[data-go]").forEach(el=>el.onclick=()=>{
+    $("symInput").value = el.dataset.go; doQuote();
+    $("symInput").scrollIntoView({behavior:"smooth",block:"center"});
+  });
+  wrap.querySelectorAll("[data-unwatch]").forEach(b=>b.onclick=()=>{
+    S.watch = S.watch.filter(x=>x!==b.dataset.unwatch);
+    save(); renderWatch();
+  });
+}
+async function addWatch(){
+  const sym = $("watchInput").value.trim().toUpperCase();
+  if(!sym) return;
+  S.watch = S.watch||[];
+  if(!S.watch.includes(sym)) S.watch.push(sym);
+  $("watchInput").value = "";
+  save(); renderWatch();
+  try{ await fetchQuote(sym); }catch(e){}
+  renderWatch();
+}
+
+/* ---------- market wire ---------- */
+async function loadWire(){
+  const n = await fh("news?category=general");
+  $("wire").innerHTML = Array.isArray(n) && n.length
+    ? n.slice(0,5).map(a=>`<a href="${a.url}" target="_blank" rel="noopener">${a.headline}<time>${a.source} · ${new Date(a.datetime*1000).toLocaleDateString()}</time></a>`).join("")
+    : '<div style="color:#56655a;font-size:.7rem">No headlines available.</div>';
 }
 
 /* ---------- math ---------- */
@@ -392,6 +580,7 @@ function render(){
   $("statStreak").textContent = S.streak + (S.streak===1?" day":" days");
 
   renderHoldings();
+  renderWatch();
   renderTape();
   renderChart();
   renderLog();
@@ -510,8 +699,11 @@ async function doQuote(){
     $("qRange").textContent = `H ${q.h.toFixed(2)} · L ${q.l.toFixed(2)}`;
     $("quoteCard").classList.add("show");
     updateEst(); msg("");
+    loadResearch(sym); // fire-and-forget
   }catch(e){
-    $("quoteCard").classList.remove("show"); pendingSym=null;
+    $("quoteCard").classList.remove("show");
+    $("research").classList.remove("show");
+    pendingSym=null;
     msg(e.message,"err");
   }
   $("quoteBtn").disabled = false;
@@ -579,14 +771,16 @@ function boot(){
       checkIn(); snapshot(); save();
       $("gate").classList.add("hidden");
       $("app").classList.remove("hidden");
-      render(); fullRefresh();
+      render(); fullRefresh(); loadWire();
     };
     return;
   }
   checkIn(); save();
+  S.watch = S.watch || [];
   $("app").classList.remove("hidden");
   render();
   fullRefresh();
+  loadWire();
 }
 
 $("quoteBtn").onclick = doQuote;
@@ -594,6 +788,9 @@ $("symInput").addEventListener("keydown", e=>{ if(e.key==="Enter") doQuote(); })
 $("qtyInput").addEventListener("input", updateEst);
 $("buyBtn").onclick = doBuy;
 $("refreshBtn").onclick = fullRefresh;
+$("scoutRefresh").onclick = fullRefresh;
+$("watchBtn").onclick = addWatch;
+$("watchInput").addEventListener("keydown", e=>{ if(e.key==="Enter") addWatch(); });
 $("settingsBtn").onclick = () => {
   const k = prompt("Finnhub API key:", S.key||"");
   if(k!==null && k.trim()){ S.key=k.trim(); save(); fullRefresh(); }
